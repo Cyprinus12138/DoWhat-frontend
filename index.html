@@ -161,7 +161,7 @@
                     color: 'danger',
                     onClick: function () {
                         $.showIndicator();
-                        for(var i = 0; i < plans.length; i++){
+                        for (var i = 0; i < plans.length; i++) {
                             deleteSingle(plans[i]._id);
                             $.hideIndicator();
                         }
@@ -198,7 +198,13 @@
             });
         }
 
-        var currentUser = JSON.parse(storage.user);
+        function logout() {
+            storage.removeItem('user');
+            window.location.href = "https://oauth.yiban.cn/code/html?client_id=d8f60613d4ccf1cb&redirect_uri=http://129.211.12.14:666/&state=STATE";
+        }
+
+        var currentUser = null;
+        if (storage.user) currentUser = JSON.parse(storage.user);
 
         if (!currentUser && getQueryString("code")) {
             $j.post("http://129.211.12.14:8999/auth/login_yb", {
@@ -409,6 +415,14 @@
                             <div class="item-inner">
                                 <a href="#" class="button button-danger" style="margin-left: auto; margin-right: auto"
                                    href="javascript:void(0);" onclick="deleteAll()">一键清除日程</a>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <a href="#" class="button button-success" style="margin-left: auto; margin-right: auto"
+                                   href="javascript:void(0);" onclick="logout()">退出当前账户</a>
                             </div>
                         </div>
                     </li>
