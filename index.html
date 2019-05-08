@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>提醒便签</title>
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+
+    <link rel="stylesheet" href="//g.alicdn.com/msui/sm/0.6.2/css/sm.min.css">
+    <link rel="stylesheet" href="//g.alicdn.com/msui/sm/0.6.2/css/sm-extend.min.css">
+    <script language="JavaScript">
+        var page = 1;
+        var limit = 5;
+        var plans = null;
+        var currentPlan = {};
+        var storage = window.localStorage;
+        var $j = jQuery.noConflict();
+
+        function showPlan(id) {
+            for (var i = 0; i < plans.length; i++) {
+                if (plans[i]._id === id) {
+                    currentPlan = plans[i];
+                    break;
+                }
+            }
+            $j("#titleIn").val(currentPlan.title);
+            $j("#contentIn").val(currentPlan.content);
+            $j("#datetime-picker").val(currentPlan.targetTime);
+            document.getElementById("ifAlarm").checked = currentPlan.isAlarm;
+            $.router.load("#plan");
+        }
+
+        function createPlan() {
+            currentPlan = {};
+            $j("#titleIn").val(currentPlan.title);
+            $j("#contentIn").val(currentPlan.content);
+            $j("#datetime-picker").val(currentPlan.targetTime);
+            document.getElementById("ifAlarm").checked = currentPlan.ifAlarm;
+            $.router.load("#plan");
+        }
+
+        function addPlans(plan) {
+            var html = '';
+            for (var i = 0; i < plan.length; i++) {
+                html += "<div class=\"card\" id=\"" + plan[i]._id + "\"" + " href=\"javascript:void(0);\" onclick =\"showPlan(\'" + plan[i]._id + "\')\">\n" +
+                    "                <div class=\"card-header\" >" + plan[i].title + "</div>\n" +
+                    "                <div class=\"card-content\">\n" +
+                    "                    <div class=\"card-content-inner\">" + plan[i].content + "</div>\n" +
+                    "                </div>\n" +
+                    "                <div class=\"card-footer\">" + plan[i].targetTime + "</div>\n" +
+                    "            </div>";
+                // 添加新条目
+            }
+            $j('#planContainer').append(html);
+        }
+
+        function getQueryString(name) {
+            var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+            var r = window.location.search.substr(1).match(reg);
+            if (r != null) return unescape(r[2]);
+            return null;
+        }
+
+        function summitPlan() {
+            $.showIndicator();
+            currentPlan.title = $j("#titleIn").val();
+            currentPlan.content = $j("#contentIn").val();
+            currentPlan.targetTime = $j("#datetime-picker").val();
+            currentPlan.isAlarm = document.getElementById("ifAlarm").checked;
+            if (currentPlan._id) {
+                for (var i = 0; i < plans.length; i++) {
+                    if (plans[i]._id === currentPlan._id) {
+                        plans[i].title = $j("#titleIn").val();
+                        plans[i].content = $j("#contentIn").val();
+                        plans[i].targetTime = $j("#datetime-picker").val();
+                        plans[i].isAlarm = document.getElementById("ifAlarm").checked;
+                        $j.ajax({
+                            url: "http://129.211.12.14:8999/plan/" + currentPlan._id,
+                            data: plans[i],
+                            type: "PUT",
+                            beforeSend: function (xhr) {
+                                xhr.setRequestHeader('token', currentUser.token);
+                            },//这里设置header
+                            complete: function (data) {
+                                $.hideIndicator();
+                            }
+                        });
+                        break;
+                    }
+                }
+            } else {
+                $j.ajax({
+                    url: "http://129.211.12.14:8999/plan/new",
+                    data: currentPlan,
+                    type: "POST",
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader('token', currentUser.token);
+                    },//这里设置header
+                    complete: function (data) {
+                        $.hideIndicator();
+                        refreshContainer();
+                        $.router.load("#main");
+                        $.toast("创建成功！");
+                    }
+                });
+            }
+        }
+
+        function deletePlan() {
+            $.showIndicator();
+            if (currentPlan._id) {
+                $j.ajax({
+                    url: "http://129.211.12.14:8999/plan/" + currentPlan._id,
+                    data: {},
+                    type: "DELETE",
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader('token', currentUser.token);
+                    },//这里设置header
+                    complete: function (data) {
+                        $.hideIndicator();
+                        $j("#" + currentPlan._id).remove();
+                        currentPlan = {};
+                        refreshContainer();
+                        $.router.load("#main");
+                        $.toast("删除成功！");
+                    }
+                });
+            } else {
+                $.hideIndicator();
+                refreshContainer();
+                $.router.load("#main");
+            }
+        }
+
+        function deleteSingle(id) {
+            $j.ajax({
+                url: "http://129.211.12.14:8999/plan/" + id,
+                data: {},
+                type: "DELETE",
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('token', currentUser.token);
+                },//这里设置header
+                complete: function (data) {
+                    $j("#" + id).remove();
+                }
+            });
+        }
+
+        function deleteAll() {
+            var buttons1 = [
+                {
+                    text: '将清除所有便签！',
+                    label: true
+                },
+                {
+                    text: '清除',
+                    bold: true,
+                    color: 'danger',
+                    onClick: function () {
+                        $.showIndicator();
+                        for(var i = 0; i < plans.length; i++){
+                            deleteSingle(plans[i]._id);
+                            $.hideIndicator();
+                        }
+                        $.alert("已经全部删除");
+                        plans = [];
+                    }
+                }
+            ];
+            var buttons2 = [
+                {
+                    text: '取消',
+                    bg: 'danger'
+                }
+            ];
+            var groups = [buttons1, buttons2];
+            $.actions(groups);
+        }
+
+        function refreshContainer() {
+            $j("#planContainer").empty();
+            $j("#avatar").attr("src", currentUser.info.yb_userhead);
+            $j("#usernameLabel").text(currentUser.info.yb_usernick);
+            $j.ajax({
+                url: "http://129.211.12.14:8999/users/plans",
+                data: {},
+                method: "GET",
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('token', currentUser.token);
+                },//这里设置header
+                complete: function (data) {
+                    plans = data.responseJSON.plans;
+                    if (plans) addPlans(plans);
+                }
+            });
+        }
+
+        var currentUser = JSON.parse(storage.user);
+
+        if (!currentUser && getQueryString("code")) {
+            $j.post("http://129.211.12.14:8999/auth/login_yb", {
+                    code: getQueryString("code")
+                },
+                function (data, status) {
+                    currentUser = data;
+                    storage.user = JSON.stringify(currentUser);
+                    $j("#avatar").attr("src", currentUser.info.yb_userhead);
+                    $j("#usernameLabel").text(currentUser.info.yb_usernick);
+                    $j.ajax({
+                        url: "http://129.211.12.14:8999/users/plans",
+                        data: {},
+                        method: "GET",
+                        beforeSend: function (xhr) {
+                            xhr.setRequestHeader('token', currentUser.token);
+                        },//这里设置header
+                        complete: function (data) {
+                            plans = data.responseJSON.plans;
+                            if (plans) addPlans(plans);
+                        }
+                    });
+                });
+        }
+        if (!currentUser && !getQueryString("code")) window.location.href = "https://oauth.yiban.cn/code/html?client_id=d8f60613d4ccf1cb&redirect_uri=http://129.211.12.14:666/&state=STATE";
+    </script>
+
+</head>
+<body>
+<script language="JavaScript">
+    var loading = false;
+    // 最多可加载的条目
+    var maxItems = 100;
+
+    // 每次加载添加多少条目
+    var itemsPerLoad = 20;
+
+
+    // 上次加载的序号
+
+    var lastIndex = 20;
+
+    // 注册'infinite'事件处理函数
+    $j(document).on('infinite', '.infinite-scroll-bottom', function () {
+
+        // 如果正在加载，则退出
+        if (loading) return;
+
+        // 设置flag
+        loading = true;
+
+        // 模拟1s的加载过程
+        setTimeout(function () {
+            // 重置加载flag
+            loading = false;
+
+            if (lastIndex >= maxItems) {
+                // 加载完毕，则注销无限加载事件，以防不必要的加载
+                $j.detachInfiniteScroll($('.infinite-scroll'));
+                // 删除加载提示符
+                $j('.infinite-scroll-preloader').remove();
+                return;
+            }
+
+            // 添加新条目
+            addItems(itemsPerLoad, lastIndex);
+            // 更新最后加载的序号
+            lastIndex = $('.list-container li').length;
+            //容器发生改变,如果是js滚动，需要刷新滚动
+            $.refreshScroller();
+        }, 1000);
+    });
+</script>
+<div class="page-group">
+    <div class="page page-current" id="main">
+        <header class="bar bar-nav">
+            <a class="icon icon-menu pull-left open-panel"></a>
+            <h1 class="title">提醒便签</h1>
+            <a href="#cal"><img class="icon pull-right" src="./icon/calendar.svg"/></a>
+        </header>
+        <div class="content infinite-scroll" id="planContainer">
+
+        </div>
+    </div>
+    <div class="page" id="cal">
+        <header class="bar bar-nav">
+            <a class="icon icon-left pull-left" href="#main"></a>
+            <h1 class="title">提醒便签</h1>
+        </header>
+        <div class="content">
+            <div class="content-block">
+                <div data-toggle='date'></div>
+            </div>
+
+        </div>
+    </div>
+    <div class="page" id="plan">
+        <header class="bar bar-nav">
+            <a class="icon icon-left pull-left" href="#main"></a>
+            <h1 class="title">提醒便签</h1>
+        </header>
+        <div class="content">
+            <div class="list-block">
+                <ul>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-media"><i class="icon icon-form-name"></i></div>
+                            <div class="item-inner">
+                                <div class="item-title label">标题</div>
+                                <div class="item-input">
+                                    <input type="text" placeholder="打算去做什么呢？" id="titleIn">
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="align-top">
+                        <div class="item-content">
+                            <div class="item-media"><i class="icon icon-form-comment"></i></div>
+                            <div class="item-inner">
+                                <div class="item-title label">内容</div>
+                                <div class="item-input">
+                                    <textarea id="contentIn"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-media"><i class="icon icon-form-calendar"></i></div>
+                            <div class="item-inner">
+                                <div class="item-title label">时间</div>
+                                <div class="item-input">
+                                    <input type="text" id='datetime-picker'/>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-media"><i class="icon icon-form-toggle"></i></div>
+                            <div class="item-inner">
+                                <div class="item-title label">开启提醒</div>
+                                <div class="item-input">
+                                    <label class="label-switch">
+                                        <input type="checkbox" id="ifAlarm">
+                                        <div class="checkbox"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="content-block">
+                <div class="row">
+                    <div class="col-50"><a href="javascript:void(0);" onclick="summitPlan()"
+                                           class="button button-big button-fill button-success">提交</a></div>
+                    <div class="col-50"><a href="javascript:void(0);" onclick="deletePlan()"
+                                           class="button button-big button-fill button-danger">删除</a></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-overlay"></div>
+    <div class="panel panel-left panel-reveal theme-dark" id='panel-left-demo'>
+        <div class="content-block">
+            <div class="list-block">
+                <ul>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <img src="images/yiban.png" id="avatar"
+                                     style="margin-right: auto; margin-left: auto; height: 64px; width: 64px;border-radius: 50%; -moz-border-radius: 50%;      -webkit-border-radius: 50%;">
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <div class="item-title label">你好，</div>
+                                <div id="usernameLabel">用户名</div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <div class="item-title label">提醒</div>
+                                <div class="item-input">
+                                    <label class="label-switch">
+                                        <input type="checkbox">
+                                        <div class="checkbox"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <a href="javascript:void(0);" onclick="createPlan()" class="button"
+                                   style="margin-right: auto; margin-left: auto">创建新的日程</a>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-content">
+                            <div class="item-inner">
+                                <a href="#" class="button button-danger" style="margin-left: auto; margin-right: auto"
+                                   href="javascript:void(0);" onclick="deleteAll()">一键清除日程</a>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+
+    </div>
+</div>
+<script type='text/javascript' src='//g.alicdn.com/sj/lib/zepto/zepto.min.js' charset='utf-8'></script>
+<script type='text/javascript' src='//g.alicdn.com/msui/sm/0.6.2/js/sm.min.js' charset='utf-8'></script>
+<script type='text/javascript' src='//g.alicdn.com/msui/sm/0.6.2/js/sm-extend.min.js' charset='utf-8'></script>
+<script>
+    $.init();
+    $("#datetime-picker").datetimePicker({
+        value: ['1985', '12', '04', '9', '34']
+    });
+</script>
+<script language="JavaScript">
+    if (currentUser) {
+        $.toast(currentUser.info.yb_usernick + "，欢迎回来！");
+        $j("#avatar").attr("src", currentUser.info.yb_userhead);
+        $j("#usernameLabel").text(currentUser.info.yb_usernick);
+        $j.ajax({
+            url: "http://129.211.12.14:8999/users/plans",
+            data: {},
+            method: "GET",
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('token', currentUser.token);
+            },//这里设置header
+            complete: function (data) {
+                plans = data.responseJSON.plans;
+                if (plans) addPlans(plans);
+            }
+        });
+    }
+</script>
+</body>
+</html>
